@@ -43,7 +43,7 @@ export default function Home() {
   const handleHotspotClick = useCallback((id: string) => {
     setActiveHotspot(id);
     setIsFocused(true);
-    scrollStoryRef.current?.focusOnHotspot(id);
+    scrollStoryRef.current?.focusOnHotspot();
   }, []);
 
   const handleExitFocus = useCallback(() => {
