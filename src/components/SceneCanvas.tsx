@@ -14,6 +14,22 @@ import { Loader } from './Loader';
 import { useScrollAnimation, useTurntableIdle } from './ScrollStory';
 import { CAMERA_CONFIG, SECTIONS, SectionId } from '@/lib/sceneConfig';
 
+// Hook to detect mobile viewport
+function useIsMobile() {
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    return isMobile;
+}
+
 interface SceneProps {
     exploreMode: boolean;
     onHotspotHover: (id: string | null) => void;
@@ -21,6 +37,7 @@ interface SceneProps {
     onSectionChange: (section: SectionId) => void;
     activeHotspot: string | null;
     isFocused: boolean;
+    isMobile: boolean;
 }
 
 function Scene({
@@ -30,6 +47,7 @@ function Scene({
     onSectionChange,
     activeHotspot,
     isFocused,
+    isMobile,
 }: SceneProps) {
     const modelRef = useRef<ProductModelRef>(null);
     const modelGroupRef = useRef<THREE.Group | null>(null);
@@ -50,19 +68,27 @@ function Scene({
         modelRef: modelGroupRef,
         onSectionChange,
         enabled: !exploreMode, // Disable when in explore mode
+        isMobile,
     });
 
     // Turntable idle animation - DISABLED to prevent flickering
     // useTurntableIdle(modelGroupRef, !exploreMode && !isFocused, isFocused);
 
+    // Mobile-specific camera adjustments: move model down and back
+    const cameraPosition: THREE.Vector3Tuple = isMobile
+        ? [0.5, -0.2, 1.5]  // Lower, further back on mobile
+        : CAMERA_CONFIG.initialPosition;
+
+    const cameraFov = isMobile ? 55 : CAMERA_CONFIG.fov; // Wider FOV on mobile
+
     return (
         <>
             <PerspectiveCamera
                 makeDefault
-                fov={CAMERA_CONFIG.fov}
+                fov={cameraFov}
                 near={CAMERA_CONFIG.near}
                 far={CAMERA_CONFIG.far}
-                position={CAMERA_CONFIG.initialPosition}
+                position={cameraPosition}
             />
 
             {/* Lighting */}
@@ -127,6 +153,7 @@ interface SceneCanvasProps {
     isFocused: boolean;
     containerRef?: React.RefObject<HTMLElement>;
     scrollStoryRef?: React.MutableRefObject<unknown>;
+    isMobile?: boolean;
 }
 
 export function SceneCanvas({
@@ -136,9 +163,12 @@ export function SceneCanvas({
     onSectionChange,
     activeHotspot,
     isFocused,
+    isMobile = false,
 }: SceneCanvasProps) {
+    // const isMobile = useIsMobile(); // Use prop from parent for consistency
+
     return (
-        <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 w-full h-full">
             <Canvas
                 gl={{
                     antialias: true,
@@ -147,6 +177,7 @@ export function SceneCanvas({
                 }}
                 dpr={[1, 2]}
                 shadows
+                style={{ width: '100%', height: '100%' }}
             >
                 <color attach="background" args={['#0a0a0a']} />
                 <fog attach="fog" args={['#0a0a0a', 2, 5]} />
@@ -157,8 +188,10 @@ export function SceneCanvas({
                     onSectionChange={onSectionChange}
                     activeHotspot={activeHotspot}
                     isFocused={isFocused}
+                    isMobile={isMobile}
                 />
             </Canvas>
         </div>
     );
 }
+

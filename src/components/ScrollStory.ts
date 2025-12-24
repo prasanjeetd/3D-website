@@ -22,6 +22,8 @@ interface UseScrollAnimationOptions {
     modelRef: React.RefObject<THREE.Group | null>;
     onSectionChange?: (section: SectionId) => void;
     enabled?: boolean; // Allow disabling during explore mode
+    isMobile?: boolean;
+    mobileCameraPosition?: THREE.Vector3Tuple;
 }
 
 // Simple scroll-based animation using useFrame
@@ -29,6 +31,8 @@ export function useScrollAnimation({
     modelRef,
     onSectionChange,
     enabled = true,
+    isMobile = false,
+    mobileCameraPosition = [0.5, -0.2, 1.5], // Default mobile position
 }: UseScrollAnimationOptions) {
     const { camera } = useThree();
     const currentSectionRef = useRef<SectionId>('hero');
@@ -60,11 +64,26 @@ export function useScrollAnimation({
             const currentConfig = SECTIONS[currentSection];
             const nextConfig = SECTIONS[nextSection];
 
-            // Lerp camera position
+            // FIXED DISTANCE: Use spherical coordinates with constant radius
+            // This ensures model size stays consistent while camera orbits
+            const fixedDistance = 1.45; // Consistent distance from origin
+
+            // Calculate target angle based on scroll (orbiting effect)
+            // Start at ~60 degrees, end at ~45 degrees azimuth
+            const startAngle = Math.PI / 3;  // 60 degrees
+            const endAngle = Math.PI / 4;    // 45 degrees
+            const azimuthAngle = THREE.MathUtils.lerp(startAngle, endAngle, scrollProgress);
+
+            // Slight vertical angle variation (15-25 degrees elevation)
+            const startElevation = 0.25;
+            const endElevation = 0.15;
+            const elevationAngle = THREE.MathUtils.lerp(startElevation, endElevation, scrollProgress);
+
+            // Convert spherical to cartesian (fixed distance)
             targetCameraRef.current = {
-                x: THREE.MathUtils.lerp(currentConfig.cameraPosition[0], nextConfig.cameraPosition[0], sectionProgress),
-                y: THREE.MathUtils.lerp(currentConfig.cameraPosition[1], nextConfig.cameraPosition[1], sectionProgress),
-                z: THREE.MathUtils.lerp(currentConfig.cameraPosition[2], nextConfig.cameraPosition[2], sectionProgress),
+                x: fixedDistance * Math.sin(azimuthAngle) * Math.cos(elevationAngle),
+                y: fixedDistance * elevationAngle * 2, // Height (scaled for visible effect)
+                z: fixedDistance * Math.cos(azimuthAngle) * Math.cos(elevationAngle),
             };
 
             // Lerp model rotation
@@ -95,9 +114,17 @@ export function useScrollAnimation({
         // Smooth camera movement with fixed lerp factor for stability
         const lerpSpeed = 0.08;
 
-        camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetCameraRef.current.x, lerpSpeed);
-        camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetCameraRef.current.y, lerpSpeed);
-        camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetCameraRef.current.z, lerpSpeed);
+        if (isMobile) {
+            // FORCE mobile position to prevent drift/zoom
+            camera.position.x = THREE.MathUtils.lerp(camera.position.x, mobileCameraPosition[0], lerpSpeed);
+            camera.position.y = THREE.MathUtils.lerp(camera.position.y, mobileCameraPosition[1], lerpSpeed);
+            camera.position.z = THREE.MathUtils.lerp(camera.position.z, mobileCameraPosition[2], lerpSpeed);
+        } else {
+            // Desktop: Follow scroll targets with FIXED distance
+            camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetCameraRef.current.x, lerpSpeed);
+            camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetCameraRef.current.y, lerpSpeed);
+            camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetCameraRef.current.z, lerpSpeed);
+        }
 
         // Always look at origin
         camera.lookAt(0, 0, 0);

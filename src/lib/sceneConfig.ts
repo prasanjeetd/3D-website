@@ -20,30 +20,31 @@ export interface HotspotConfig {
 export const SECTION_IDS = ['hero', 'features', 'details', 'cta'] as const;
 export type SectionId = typeof SECTION_IDS[number];
 
+// All camera positions normalized to ~1.4 distance from origin for consistent model size
 export const SECTIONS: Record<SectionId, SectionConfig> = {
   hero: {
-    cameraPosition: [0.8, 0.4, 1],
+    cameraPosition: [0.8, 0.4, 1.1],  // distance ~1.43
     cameraTarget: [0, 0, 0],
-    modelRotation: [0, -0.5, 0],
+    modelRotation: [0, -1.57, 0],
     lightIntensity: 2,
     lightPosition: [3, 3, 3],
   },
   features: {
-    cameraPosition: [0.6, 0.1, 0.8],
-    cameraTarget: [0, 0.05, 0],
+    cameraPosition: [0.9, 0.3, 1.0],  // distance ~1.40 (was 1.0, too close)
+    cameraTarget: [0, 0, 0],
     modelRotation: [0, Math.PI * 0.3, 0],
     lightIntensity: 2.5,
     lightPosition: [2, 3, 2],
   },
   details: {
-    cameraPosition: [0.5, 0.2, 0.7],
+    cameraPosition: [0.7, 0.4, 1.15], // distance ~1.42
     cameraTarget: [0, 0, 0],
     modelRotation: [0, Math.PI * 0.6, 0],
     lightIntensity: 2.2,
     lightPosition: [2, 2, 3],
   },
   cta: {
-    cameraPosition: [1, 0.3, 0.9],
+    cameraPosition: [0.85, 0.35, 1.1], // distance ~1.43 (was 1.83, too far)
     cameraTarget: [0, 0, 0],
     modelRotation: [0, Math.PI * 0.9, 0],
     lightIntensity: 2.8,
@@ -90,7 +91,7 @@ export const CAMERA_CONFIG = {
   fov: 45,
   near: 0.01,
   far: 50,
-  initialPosition: [0.8, 0.4, 1] as THREE.Vector3Tuple,
+  initialPosition: [0.8, 0.4, 1.1] as THREE.Vector3Tuple,
 };
 
 export const MODEL_CONFIG = {
