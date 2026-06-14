@@ -9,8 +9,8 @@ import {
     OrbitControls,
 } from '@react-three/drei';
 import * as THREE from 'three';
+import studioHdri from '@pmndrs/assets/hdri/studio.exr';
 import { ProductModel, ProductModelRef } from './ProductModel';
-import { Loader } from './Loader';
 import { useScrollAnimation, useTurntableIdle } from './ScrollStory';
 import { CAMERA_CONFIG, SECTIONS, SectionId } from '@/lib/sceneConfig';
 
@@ -30,6 +30,23 @@ function useIsMobile() {
     return isMobile;
 }
 
+// Fires onReady once it mounts — and it only mounts after the Suspense around the
+// model + environment resolves. We wait two animation frames so the first frame has
+// actually painted (shaders compiled, textures uploaded) before hiding the loader.
+function SceneReady({ onReady }: { onReady?: () => void }) {
+    useEffect(() => {
+        let raf2 = 0;
+        const raf1 = requestAnimationFrame(() => {
+            raf2 = requestAnimationFrame(() => onReady?.());
+        });
+        return () => {
+            cancelAnimationFrame(raf1);
+            cancelAnimationFrame(raf2);
+        };
+    }, [onReady]);
+    return null;
+}
+
 interface SceneProps {
     exploreMode: boolean;
     onHotspotHover: (id: string | null) => void;
@@ -38,6 +55,7 @@ interface SceneProps {
     activeHotspot: string | null;
     isFocused: boolean;
     isMobile: boolean;
+    onReady?: () => void;
 }
 
 function Scene({
@@ -48,6 +66,7 @@ function Scene({
     activeHotspot,
     isFocused,
     isMobile,
+    onReady,
 }: SceneProps) {
     const modelRef = useRef<ProductModelRef>(null);
     const modelGroupRef = useRef<THREE.Group | null>(null);
@@ -74,12 +93,13 @@ function Scene({
     // Turntable idle animation - DISABLED to prevent flickering
     // useTurntableIdle(modelGroupRef, !exploreMode && !isFocused, isFocused);
 
-    // Mobile-specific camera adjustments: move model down and back
+    // Mobile camera: desktop-like side angle but closer + tighter FOV, so the cleaver
+    // shows its broad side profile and fills the top area (bigger).
     const cameraPosition: THREE.Vector3Tuple = isMobile
-        ? [0.5, -0.2, 1.5]  // Lower, further back on mobile
+        ? [0.7, 0.25, 0.95]
         : CAMERA_CONFIG.initialPosition;
 
-    const cameraFov = isMobile ? 55 : CAMERA_CONFIG.fov; // Wider FOV on mobile
+    const cameraFov = isMobile ? 42 : CAMERA_CONFIG.fov;
 
     return (
         <>
@@ -101,11 +121,12 @@ function Scene({
             />
             <directionalLight position={[-2, 2, -2]} intensity={0.8} />
 
-            {/* Environment */}
-            <Environment preset="studio" background={false} />
-
-            {/* Model */}
-            <Suspense fallback={<Loader />}>
+            {/* Environment + Model share ONE Suspense boundary inside the Canvas.
+                Environment (HDRI) suspends while loading; keeping it here means it always
+                has its own boundary and never needs a page-level Suspense.
+                HDRI is bundled locally (was preset="studio" → remote CDN → crashed on fetch fail). */}
+            <Suspense fallback={null}>
+                <Environment files={studioHdri} background={false} />
                 <ProductModel
                     ref={modelRef}
                     activeHotspot={activeHotspot}
@@ -113,6 +134,7 @@ function Scene({
                     onHotspotClick={onHotspotClick}
                     showHotspots={false}
                 />
+                <SceneReady onReady={onReady} />
             </Suspense>
 
             {/* Contact shadows */}
@@ -154,6 +176,7 @@ interface SceneCanvasProps {
     containerRef?: React.RefObject<HTMLElement>;
     scrollStoryRef?: React.MutableRefObject<unknown>;
     isMobile?: boolean;
+    onReady?: () => void;
 }
 
 export function SceneCanvas({
@@ -164,6 +187,7 @@ export function SceneCanvas({
     activeHotspot,
     isFocused,
     isMobile = false,
+    onReady,
 }: SceneCanvasProps) {
     // const isMobile = useIsMobile(); // Use prop from parent for consistency
 
@@ -189,6 +213,7 @@ export function SceneCanvas({
                     activeHotspot={activeHotspot}
                     isFocused={isFocused}
                     isMobile={isMobile}
+                    onReady={onReady}
                 />
             </Canvas>
         </div>

@@ -41,8 +41,9 @@ export function Loader() {
 }
 
 export function FullScreenLoader() {
-    const { progress } = useProgress();
-
+    // No useProgress() %: the model and HDRI load as two separate batches, so the
+    // percentage hit 100% twice ("double loaded"). This loader is indeterminate and is
+    // hidden by the parent the moment the cleaver has actually painted (sceneReady).
     return (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-black">
             {/* Logo/Icon */}
@@ -61,22 +62,9 @@ export function FullScreenLoader() {
             </h1>
             <p className="text-zinc-500 text-sm mb-8">Master Craftsmanship</p>
 
-            {/* Progress */}
-            <div className="flex flex-col items-center">
-                <p className="text-4xl font-light text-white mb-6 tracking-widest tabular-nums">
-                    {Math.round(progress)}%
-                </p>
-
-                <div className="w-72 h-1.5 bg-zinc-800 rounded-full overflow-hidden shadow-inner">
-                    <div
-                        className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 transition-all duration-300 ease-out rounded-full"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-
-                <p className="text-zinc-600 text-xs mt-6 tracking-wider uppercase">
-                    {progress < 30 ? 'Loading textures...' : progress < 70 ? 'Building scene...' : 'Almost ready...'}
-                </p>
+            {/* Indeterminate progress bar */}
+            <div className="w-72 h-1.5 bg-zinc-800 rounded-full overflow-hidden shadow-inner">
+                <div className="h-full w-1/3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-full animate-loader-slide" />
             </div>
         </div>
     );

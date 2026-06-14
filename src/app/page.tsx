@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useLayoutEffect, Suspense } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebGLGuard } from '@/components/WebGLGuard';
@@ -9,12 +9,15 @@ import { FullScreenLoader } from '@/components/Loader';
 import { useScrollStory } from '@/components/ScrollStory';
 import { SectionId } from '@/lib/sceneConfig';
 
-// Dynamic import for Canvas to avoid SSR issues
+// Dynamic import for Canvas to avoid SSR issues.
+// No `loading` here — a single page-level FullScreenLoader (driven by `sceneReady`)
+// covers BOTH the JS chunk load AND the model/shader load, so there's one continuous
+// loader and no blank gap before the cleaver appears.
 const SceneCanvas = dynamic(
   () => import('@/components/SceneCanvas').then(mod => mod.SceneCanvas),
   {
     ssr: false,
-    loading: () => <FullScreenLoader />
+    loading: () => null
   }
 );
 
@@ -32,7 +35,6 @@ function useIsMobile() {
 
 export default function Home() {
   const containerRef = useRef<HTMLElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null); // Ref for direct DOM manipulation
   const scrollStoryRef = useRef<ReturnType<typeof useScrollStory> | null>(null);
 
   const [currentSection, setCurrentSection] = useState<SectionId>('hero');
@@ -40,41 +42,9 @@ export default function Home() {
   const [isFocused, setIsFocused] = useState(false);
   const [activeHotspot, setActiveHotspot] = useState<string | null>(null);
   const [hoveredHotspot, setHoveredHotspot] = useState<string | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
 
   const isMobile = useIsMobile();
-
-  // Mobile Header Config
-  const maxMobileHeight = 350;
-  const minMobileHeight = 120;
-
-  // Optimized Scroll Handler for Mobile Header Resize
-  // Uses direct DOM manipulation to avoid React re-renders (smoothness fix)
-  useEffect(() => {
-    if (!isMobile || !headerRef.current) return;
-
-    let ticking = false;
-
-    const updateHeight = () => {
-      if (!headerRef.current) return;
-      const scrollY = window.scrollY;
-      const newHeight = Math.max(minMobileHeight, maxMobileHeight - (scrollY * 0.8));
-      headerRef.current.style.height = `${newHeight}px`;
-      ticking = false;
-    };
-
-    const onScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(updateHeight);
-        ticking = true;
-      }
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    // Initial call to set correct height on load
-    updateHeight();
-
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [isMobile]);
 
   const handleSectionChange = useCallback((section: SectionId) => {
     setCurrentSection(section);
@@ -103,6 +73,10 @@ export default function Home() {
   return (
     <ErrorBoundary>
       <WebGLGuard>
+        {/* One continuous loader: stays until the cleaver has actually painted on screen
+            (sceneReady fires from inside the Canvas after the model + shaders are ready).
+            Covers chunk load AND asset load → no double loader, no blank gap. */}
+        {!sceneReady && <FullScreenLoader />}
         <main ref={containerRef} className="relative bg-zinc-950 min-h-screen">
           {/* UI Overlay - always on top */}
           <UIOverlay
@@ -114,46 +88,29 @@ export default function Home() {
             hoveredHotspot={hoveredHotspot}
           />
 
-          {/* ===== CANVAS CONTAINER (FIXED HEADER) ===== */}
+          {/* ===== CANVAS (fixed background) =====
+              Mobile: occupies the TOP ~55vh so the cleaver sits up top; the hero text below
+              has matching top padding → no overlap on the first screen. On scroll the content
+              slides up over this fixed canvas (z-10 over z-0) and overlaps the rotating cleaver.
+              Desktop: full-screen background behind the left content column.
+              pointer-events only in explore mode so normal touch-scroll passes through. */}
           <div
-            ref={headerRef} // Attached ref for logic
-            className={`fixed left-0 right-0 pointer-events-auto transition-colors duration-300 ease-out
-              ${isMobile ? 'top-0 z-50 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden flex flex-col items-center pt-4' : 'inset-0 h-screen z-0'}
-            `}
-            style={isMobile ? { height: maxMobileHeight } : { height: '100vh' }}
+            className={`fixed left-0 right-0 z-0 ${exploreMode ? 'pointer-events-auto' : 'pointer-events-none'} ${isMobile ? 'top-0' : 'inset-0 h-screen'}`}
+            style={isMobile ? { height: '55vh' } : { height: '100vh' }}
           >
-            {/* Mobile Badge - Inside Header to maintain "Badge -> Object" order */}
-            {isMobile && (
-              <span className="shrink-0 inline-block px-4 py-2 rounded-full bg-amber-500/10 text-amber-400 text-sm font-medium mb-2 border border-amber-500/20 animate-fade-in relative z-50">
-                Master Craftsmanship
-              </span>
-            )}
-
-            <div className={`relative w-full ${isMobile ? 'flex-1 min-h-0' : 'h-full'}`}>
-              <Suspense fallback={<FullScreenLoader />}>
-                <SceneCanvas
-                  exploreMode={exploreMode}
-                  onHotspotHover={handleHotspotHover}
-                  onHotspotClick={handleHotspotClick}
-                  onSectionChange={handleSectionChange}
-                  activeHotspot={activeHotspot}
-                  isFocused={isFocused}
-                  containerRef={containerRef as React.RefObject<HTMLElement>}
-                  scrollStoryRef={scrollStoryRef}
-                  isMobile={isMobile}
-                />
-              </Suspense>
-            </div>
-
-            {/* Mobile Gradient Fade at bottom */}
-            {isMobile && (
-              <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-zinc-950 to-transparent pointer-events-none" />
-            )}
+            <SceneCanvas
+              exploreMode={exploreMode}
+              onHotspotHover={handleHotspotHover}
+              onHotspotClick={handleHotspotClick}
+              onSectionChange={handleSectionChange}
+              activeHotspot={activeHotspot}
+              isFocused={isFocused}
+              containerRef={containerRef as React.RefObject<HTMLElement>}
+              scrollStoryRef={scrollStoryRef}
+              isMobile={isMobile}
+              onReady={() => setSceneReady(true)}
+            />
           </div>
-
-          {/* ===== MOBILE SPACER ===== */}
-          {/* Pushes content down so it starts below the large header initially */}
-          {isMobile && <div style={{ height: maxMobileHeight }} />}
 
           {/* ===== SCROLLING CONTENT ===== */}
           <div className="relative z-10 md:z-10 w-full md:grid md:grid-cols-2">
@@ -161,11 +118,13 @@ export default function Home() {
             {/* Content Column (Left on Desktop, Full on Mobile) */}
             <div className="flex flex-col">
 
-              {/* === HERO SECTION === */}
-              <section id="hero" className="min-h-screen flex flex-col justify-start md:justify-center px-6 md:px-12 lg:px-16 pt-8 md:pt-0">
+              {/* === HERO SECTION ===
+                  Mobile: pt-[55vh] pushes the text below the fixed 55vh cleaver canvas →
+                  no overlap on first screen. Desktop: vertically centered as before. */}
+              <section id="hero" className="min-h-screen flex flex-col justify-start md:justify-center px-6 md:px-12 lg:px-16 pt-[55vh] md:pt-0">
 
-                {/* Badge (Desktop Only) */}
-                <span className="hidden md:inline-block px-4 py-2 rounded-full bg-amber-500/10 text-amber-400 text-sm font-medium mb-4 border border-amber-500/20 animate-fade-in self-start relative">
+                {/* Badge */}
+                <span className="inline-block px-4 py-2 rounded-full bg-amber-500/10 text-amber-400 text-sm font-medium mb-4 border border-amber-500/20 animate-fade-in self-start relative">
                   Master Craftsmanship
                 </span>
 

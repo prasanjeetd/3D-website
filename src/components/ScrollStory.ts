@@ -32,7 +32,7 @@ export function useScrollAnimation({
     onSectionChange,
     enabled = true,
     isMobile = false,
-    mobileCameraPosition = [0.5, -0.2, 1.5], // Default mobile position
+    mobileCameraPosition = [0.7, 0.25, 0.95], // Mobile: side profile, closer (bigger)
 }: UseScrollAnimationOptions) {
     const { camera } = useThree();
     const currentSectionRef = useRef<SectionId>('hero');
