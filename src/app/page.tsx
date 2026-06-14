@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebGLGuard } from '@/components/WebGLGuard';
 import { UIOverlay } from '@/components/UIOverlay';
-import { FullScreenLoader } from '@/components/Loader';
 import { useScrollStory } from '@/components/ScrollStory';
 import { SectionId } from '@/lib/sceneConfig';
 
@@ -73,10 +72,6 @@ export default function Home() {
   return (
     <ErrorBoundary>
       <WebGLGuard>
-        {/* One continuous loader: stays until the cleaver has actually painted on screen
-            (sceneReady fires from inside the Canvas after the model + shaders are ready).
-            Covers chunk load AND asset load → no double loader, no blank gap. */}
-        {!sceneReady && <FullScreenLoader />}
         <main ref={containerRef} className="relative bg-zinc-950 min-h-screen">
           {/* UI Overlay - always on top */}
           <UIOverlay
@@ -110,6 +105,14 @@ export default function Home() {
               isMobile={isMobile}
               onReady={() => setSceneReady(true)}
             />
+
+            {/* Subtle, non-blocking spinner only in the 3D area until the cleaver paints.
+                The page (text, buttons) is fully visible and interactive immediately. */}
+            {!sceneReady && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-10 h-10 rounded-full border-2 border-amber-500/25 border-t-amber-500 animate-spin" />
+              </div>
+            )}
           </div>
 
           {/* ===== SCROLLING CONTENT ===== */}

@@ -95,7 +95,7 @@ export const CAMERA_CONFIG = {
 };
 
 export const MODEL_CONFIG = {
-  path: '/models/cleaver/scene-opt.gltf', // WebP textures (~1.2 MB vs ~11.3 MB), geometry + node matrices untouched
+  path: '/models/cleaver/scene-1k.gltf', // 1024px WebP textures (~251 KB total, was 11.3 MB raw)
   scale: 3,
   position: [0, 0, 0] as THREE.Vector3Tuple,
 };

@@ -27,6 +27,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {/* Preload the cleaver textures (the bulk of the model) so they download in
+            parallel with the JS engine chunk instead of waiting for it to load first.
+            crossOrigin matches three.js TextureLoader (anonymous) so the browser reuses
+            the preloaded files instead of re-fetching. */}
+        <link rel="preload" as="image" crossOrigin="anonymous" href="/models/cleaver/textures/M_Cleaver_baseColor_1k.webp" />
+        <link rel="preload" as="image" crossOrigin="anonymous" href="/models/cleaver/textures/M_Cleaver_metallicRoughness_1k.webp" />
+        <link rel="preload" as="image" crossOrigin="anonymous" href="/models/cleaver/textures/M_Cleaver_normal_1k.webp" />
+        <link rel="preload" as="fetch" crossOrigin="anonymous" href="/models/cleaver/scene-1k.gltf" />
+        <link rel="preload" as="fetch" crossOrigin="anonymous" href="/models/cleaver/scene.bin" />
+      </head>
       <body className={`${inter.variable} bg-zinc-950 text-zinc-100 antialiased`} suppressHydrationWarning>
         {children}
       </body>
